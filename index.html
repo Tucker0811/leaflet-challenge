@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Earthquake Map</title>
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+    <style>
+        /* Set the map height */
+        #map {
+            height: 100vh; /* Full height */
+        }
+        /* Style for the legend */
+        .legend {
+            background: white;
+            padding: 10px;
+            border-radius: 5px;
+            box-shadow: 0 0 5px rgba(0,0,0,0.5);
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Map container -->
+    <div id="map"></div>
+
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+    <script>
+        // Create the 'basemap' tile layer that will be the background of our map.
+        let basemap = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors'
+        });
+
+        // Create the 'street' tile layer as a second background of the map.
+        let street = L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
+            attribution: 'Map data: © OpenStreetMap contributors, SRTM | Map style: © OpenTopoMap ( CC-BY-SA )'
+        });
+
+        // Create the map object with center and zoom options.
+        let myMap = L.map("map", {
+            center: [37.09, -95.71], // Center of the US
+            zoom: 5, // Zoom level
+            layers: [basemap] // Add the basemap layer
+        });
+
+        // Create a legend control.
+        let legend = L.control({ position: 'bottomright' });
+
+        legend.onAdd = function () {
+            let div = L.DomUtil.create('div', 'legend');
+            div.innerHTML += '<strong>Depth (km)</strong><br>';
+            div.innerHTML += '<i style="background: #00FF00"></i> 0-20<br>';
+            div.innerHTML += '<i style="background: #FFA500"></i> 20-50<br>';
+            div.innerHTML += '<i style="background: #FF0000"></i> 50+<br>';
+            return div;
+        };
+
+        legend.addTo(myMap);
+
+        // URL to fetch earthquake data
+        let queryUrl = "https://earthquake.usgs.gov/fdsnws/event/1/query?format=geojson&starttime=2023-10-01&endtime=2023-10-08";
+
+        // Fetch the earthquake data
+        fetch(queryUrl)
+            .then(response => response.json())
+            .then(data => {
+                // Process the GeoJSON data and add it to the map
+                L.geoJSON(data.features, {
+                    pointToLayer: function (feature, latlng) {
+                        // Calculate the size based on magnitude
+                        let radius = feature.properties.mag * 3; // Adjust multiplier as needed
+                        let depth = feature.geometry.coordinates[2]; // Get depth
+                        let color = depth > 50 ? '#FF0000' : depth > 20 ? '#FFA500' : '#00FF00'; // Color based on depth
+
+                        return L.circleMarker(latlng, {
+                            radius: radius,
+                            fillColor: color,
+                            color: '#000',
+                            weight: 1,
+                            opacity: 1,
+                            fillOpacity: 0.8
+                        });
+                    },
+                    onEachFeature: function (feature, layer) {
+                        layer.bindPopup(`Magnitude: ${feature.properties.mag}<br>Location: ${feature.properties.place}<br>Depth: ${feature.geometry.coordinates[2]} km<br>Time: ${new Date(feature.properties.time)}`);
+                    }
+                }).addTo(myMap);
+            })
+            .catch(error => console.error('Error fetching the earthquake data:', error));
+    </script>
+</body>
+</html>
